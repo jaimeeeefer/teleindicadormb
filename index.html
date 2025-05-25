@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teleindicador Metro Bilbao</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 800px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #d10000; /* Color de Metro Bilbao */
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        label {
+            font-weight: bold;
+            color: #555;
+        }
+        select {
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1em;
+            width: 100%;
+            box-sizing: border-box;
+            background-color: white; /* Asegura el fondo blanco en el desplegable */
+            cursor: pointer;
+        }
+        button {
+            background-color: #d10000; /* Color de Metro Bilbao */
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: background-color 0.3s ease;
+            align-self: flex-start;
+        }
+        button:hover {
+            background-color: #a30000;
+        }
+        .results-section {
+            width: 100%;
+            margin-top: 20px;
+        }
+        h2 {
+            color: #d10000;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+            font-size: 0.95em;
+        }
+        th {
+            background-color: #d10000;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 15px;
+        }
+        .loading {
+            text-align: center;
+            margin-top: 20px;
+            font-style: italic;
+            color: #666;
+        }
+        .dynamic-results-section {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Teleindicador Metro Bilbao</h1>
+        <div class="input-section">
+            <label for="stationSelect">Selecciona una estación:</label>
+            <select id="stationSelect"></select>
+            <button onclick="consultarTrenes()">Consultar Trenes</button>
+        </div>
+    </div>
+
+    <div class="container results-section">
+        <h2 id="resultsTitle">Próximos Trenes</h2>
+        <div id="loadingMessage" class="loading" style="display: none;">Cargando datos...</div>
+        <div id="errorMessage" class="error" style="display: none;"></div>
+        
+        <div id="dynamicResultsContainer">
+            </div>
+    </div>
+
+    <script>
+        const stationOrder = [
+            { code: "PLE", name: "Plentzia" },
+            { code: "URD", name: "Urduliz" },
+            { code: "SOP", name: "Sopela" },
+            { code: "LAR", name: "Larrabasterra" },
+            { code: "BER", name: "Berango" },
+            { code: "IBB", name: "Ibarbengoa" },
+            { code: "BID", name: "Bidezabal" },
+            { code: "GOB", name: "Gobela" },
+            { code: "NEG", name: "Neguri" },
+            { code: "ALG", name: "Algorta" },
+            { code: "AIB", name: "Aiboa" },
+            { code: "ARE", name: "Areeta" },
+            { code: "LAM", name: "Lamiako" },
+            { code: "LEI", name: "Leioa" },
+            { code: "ERA", name: "Erandio" },
+            { code: "AST", name: "Astrabudua" },
+            { code: "LUT", name: "Lutxana" },
+            { code: "KAB", name: "Kabiezes" },
+            { code: "STZ", name: "Santurtzi" },
+            { code: "PEN", name: "Peñota" },
+            { code: "POR", name: "Portugalete" },
+            { code: "ABT", name: "Abatxolo" },
+            { code: "SES", name: "Sestao" },
+            { code: "URB", name: "Urbinaga" },
+            { code: "BAG", name: "Bagatza" },
+            { code: "BAR", name: "Barakaldo" },
+            { code: "ANS", name: "Ansio" },
+            { code: "GUR", name: "Gurutzeta / Cruces" },
+            { code: "SIN", name: "San Ignazio" },
+            { code: "SAR", name: "Sarriko" },
+            { code: "DEU", name: "Deustu" },
+            { code: "SAM", name: "Santimami / San Mamés" },
+            { code: "IND", name: "Indautxu" },
+            { code: "MOY", name: "Moyua" },
+            { code: "ABA", name: "Abando" },
+            { code: "CAV", name: "Zazpikaleak / Casco Viejo" },
+            { code: "SAN", name: "Santutxu" },
+            { code: "BAS", name: "Basarrate" },
+            { code: "BOL", name: "Bolueta" },
+            { code: "ETX", name: "Etxebarri" },
+            { code: "ARZ", name: "Ariz" },
+            { code: "BSR", name: "Basauri" }
+        ];
+
+        // Mapeo para búsqueda rápida de nombres de estación por código
+        const stationCodes = {};
+        stationOrder.forEach(station => {
+            stationCodes[station.code] = station.name;
+        });
+
+        // Función para poblar el desplegable de estaciones al cargar la página
+        function populateStationSelect() {
+            const selectElement = document.getElementById('stationSelect');
+            // Añadir una opción por defecto para "selecciona"
+            const defaultOption = document.createElement('option');
+            defaultOption.value = "";
+            defaultOption.textContent = "Selecciona una estación...";
+            selectElement.appendChild(defaultOption);
+
+            stationOrder.forEach(station => {
+                const option = document.createElement('option');
+                option.value = station.code;
+                option.textContent = `${station.name} (${station.code})`;
+                selectElement.appendChild(option);
+            });
+        }
+
+        // Llamar a la función para poblar el desplegable cuando el DOM esté cargado
+        document.addEventListener('DOMContentLoaded', populateStationSelect);
+
+
+        // Función para mapear el nombre de la dirección al código (si es posible)
+        function getStationCodeFromName(name) {
+            for (const code in stationCodes) {
+                if (stationCodes[code].toLowerCase() === name.toLowerCase()) {
+                    return code;
+                }
+            }
+            return name; // Devuelve el nombre si no encuentra un código
+        }
+
+        // Función para obtener las estaciones anterior y siguiente
+        function getNeighboringStations(currentStationCode) {
+            const index = stationOrder.findIndex(s => s.code === currentStationCode);
+            let prevStation = null;
+            let nextStation = null;
+
+            if (index !== -1) {
+                if (index > 0) {
+                    prevStation = stationOrder[index - 1];
+                }
+                if (index < stationOrder.length - 1) {
+                    nextStation = stationOrder[index + 1];
+                }
+            }
+            return { prev: prevStation, next: nextStation };
+        }
+
+
+        async function consultarTrenes() {
+            const stationSelect = document.getElementById('stationSelect');
+            const stationCode = stationSelect.value;
+            const errorMessage = document.getElementById('errorMessage');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const dynamicResultsContainer = document.getElementById('dynamicResultsContainer');
+            
+            dynamicResultsContainer.innerHTML = '';
+            errorMessage.style.display = 'none';
+
+            if (!stationCode) {
+                errorMessage.textContent = 'Por favor, selecciona una estación.';
+                errorMessage.style.display = 'block';
+                return;
+            }
+
+            loadingMessage.style.display = 'block';
+
+            const { prev, next } = getNeighboringStations(stationCode);
+            const targetDestinations = [];
+
+            if (prev) {
+                targetDestinations.push(prev.code);
+            }
+            if (next) {
+                targetDestinations.push(next.code);
+            }
+
+            if (targetDestinations.length === 0) {
+                loadingMessage.style.display = 'none';
+                errorMessage.textContent = 'No se pudieron determinar las estaciones vecinas para esta estación.';
+                errorMessage.style.display = 'block';
+                return;
+            }
+
+            for (const apiDest of targetDestinations) {
+                const url = `https://api.metrobilbao.eus/metro/real-time/${stationCode}/${apiDest}`;
+                
+                const destinationSection = document.createElement('div');
+                destinationSection.classList.add('dynamic-results-section');
+                dynamicResultsContainer.appendChild(destinationSection);
+
+                const destinationTitle = document.createElement('h3');
+                destinationTitle.textContent = `Hacia ${stationCodes[apiDest] || apiDest}`;
+                destinationSection.appendChild(destinationTitle);
+
+                const table = document.createElement('table');
+                const thead = document.createElement('thead');
+                const tbody = document.createElement('tbody');
+                table.appendChild(thead);
+                table.appendChild(tbody);
+                destinationSection.appendChild(table);
+
+                thead.innerHTML = `
+                    <tr>
+                        <th>Tiempo restante</th>
+                        <th>Vagones</th>
+                        <th>Destino Real</th>
+                    </tr>
+                `;
+
+                const noTrainsP = document.createElement('p');
+                noTrainsP.style.fontStyle = 'italic';
+                noTrainsP.style.textAlign = 'center';
+                noTrainsP.style.display = 'none';
+                noTrainsP.textContent = `No hay trenes próximos hacia ${stationCodes[apiDest] || apiDest}.`;
+                destinationSection.appendChild(noTrainsP);
+
+                try {
+                    const response = await fetch(url);
+                    
+                    // Si la respuesta no es OK (ej. 404, 500, etc.), o no hay datos, lo tratamos como "no hay trenes"
+                    if (!response.ok) {
+                        console.warn(`API responded with status ${response.status} for ${stationCode} towards ${apiDest}. Treating as no trains available.`);
+                        noTrainsP.style.display = 'block';
+                        continue; // Pasar al siguiente destino
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data && data.trains && data.trains.length > 0) {
+                        data.trains.forEach(train => {
+                            const row = tbody.insertRow();
+                            const timeCell = row.insertCell(0);
+                            const wagonsCell = row.insertCell(1);
+                            const directionCell = row.insertCell(2);
+
+                            timeCell.textContent = formatTime(train.estimated);
+                            wagonsCell.textContent = train.wagons || 'N/A';
+                            directionCell.textContent = stationCodes[getStationCodeFromName(train.direction)] || train.direction;
+                        });
+                    } else {
+                        // Si la respuesta es OK pero el array 'trains' está vacío o no existe
+                        noTrainsP.style.display = 'block';
+                    }
+                } catch (error) {
+                    // Este catch se activará por errores de red (ej. sin conexión) o JSON malformado
+                    console.error(`Error de red o parsing para ${apiDest}:`, error);
+                    // Mostrar "No hay trenes próximos" en lugar de un error técnico para el usuario
+                    noTrainsP.style.display = 'block'; 
+                    // Opcionalmente, puedes mostrar un mensaje de error general si prefieres:
+                    // errorMessage.textContent = `Hubo un problema de conexión al cargar datos para ${stationCodes[apiDest] || apiDest}.`;
+                    // errorMessage.style.display = 'block';
+                }
+            }
+            loadingMessage.style.display = 'none';
+        }
+
+        function formatTime(timeInMinutes) {
+            if (timeInMinutes === 0) {
+                return 'En estación';
+            } else if (timeInMinutes === 1) {
+                return '1 minuto';
+            } else if (timeInMinutes < 60) {
+                return `${timeInMinutes} minutos`;
+            } else {
+                const hours = Math.floor(timeInMinutes / 60);
+                const minutes = timeInMinutes % 60;
+                return `${hours}h ${minutes}min`;
+            }
+        }
+    </script>
+</body>
+</html>
