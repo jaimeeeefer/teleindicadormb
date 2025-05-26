@@ -178,18 +178,15 @@
             { code: "BSR", name: "Basauri" }
         ];
 
-        // Mapeo para búsqueda rápida de nombres de estación por código
         const stationCodes = {};
         stationOrder.forEach(station => {
             stationCodes[station.code] = station.name;
         });
 
-        // Función para poblar el datalist de estaciones al cargar la página
         function populateStationDatalist() {
             const datalistElement = document.getElementById('stationList');
             stationOrder.forEach(station => {
                 const option = document.createElement('option');
-                // Mostrar nombre (código) para que el usuario lo vea
                 option.value = `${station.name} (${station.code})`;
                 datalistElement.appendChild(option);
             });
@@ -197,51 +194,46 @@
 
         document.addEventListener('DOMContentLoaded', populateStationDatalist);
 
-        // Función para extraer el código de la estación del valor del input
         function getStationCodeFromInput(inputValue) {
-            // Intenta extraer el código entre paréntesis al final (ej. "ABA")
             const match = inputValue.match(/\(([A-Z]+)\)$/);
             if (match && match[1]) {
                 return match[1];
             }
-            // Si no se encuentra el formato (Nombre (CÓDIGO)), intenta buscar por el nombre exacto
             for (const code in stationCodes) {
                 if (stationCodes[code].toLowerCase() === inputValue.toLowerCase()) {
                     return code;
                 }
             }
-            return null; // Si no se encuentra un código válido
+            return null;
         }
 
-        // Función para obtener las estaciones de destino relevantes
         function getNeighboringStations(currentStationCode) {
             const neighbors = [];
             const index = stationOrder.findIndex(s => s.code === currentStationCode);
 
             if (index === -1) {
-                return []; // Estación no encontrada
+                return [];
             }
 
             switch (currentStationCode) {
                 case "LUT": // Lutxana
-                    neighbors.push({ code: "ERA", name: "Erandio" }); // Anterior en la línea 1/2
-                    neighbors.push({ code: "SIN", name: "San Ignazio" }); // Siguiente hacia la bifurcación L1/L2
+                    neighbors.push({ code: "ERA", name: "Erandio" });
+                    neighbors.push({ code: "SIN", name: "San Ignazio" });
                     break;
-                case "KAB": // Kabiezes (terminal de la L2, solo tiene una dirección "siguiente")
-                    neighbors.push({ code: "STZ", name: "Santurtzi" }); // Hacia Santurtzi (siguiente lógica en la línea 2)
+                case "KAB": // Kabiezes (terminal)
+                    neighbors.push({ code: "STZ", name: "Santurtzi" });
                     break;
-                case "SIN": // San Ignazio (punto de bifurcación)
-                    neighbors.push({ code: "GUR", name: "Gurutzeta / Cruces" }); // Anterior (viene de L2)
-                    neighbors.push({ code: "LUT", name: "Lutxana" }); // Anterior (viene de L2)
-                    neighbors.push({ code: "SAR", name: "Sarriko" }); // Siguiente (hacia L1/L2 centro)
+                case "SIN": // San Ignazio (bifurcación)
+                    neighbors.push({ code: "GUR", name: "Gurutzeta / Cruces" });
+                    neighbors.push({ code: "LUT", name: "Lutxana" });
+                    neighbors.push({ code: "SAR", name: "Sarriko" });
                     break;
                 default:
-                    // Lógica general para la mayoría de estaciones
                     if (index > 0) {
-                        neighbors.push(stationOrder[index - 1]); // Anterior
+                        neighbors.push(stationOrder[index - 1]);
                     }
                     if (index < stationOrder.length - 1) {
-                        neighbors.push(stationOrder[index + 1]); // Siguiente
+                        neighbors.push(stationOrder[index + 1]);
                     }
                     break;
             }
@@ -251,20 +243,16 @@
 
         async function consultarTrenes() {
             const stationInput = document.getElementById('stationInput');
-            // Obtener el valor del input y eliminar espacios en blanco
             const selectedStationValue = stationInput.value.trim();
-            // Extraer el código de la estación a partir del valor del input
             const stationCode = getStationCodeFromInput(selectedStationValue);
 
             const errorMessage = document.getElementById('errorMessage');
             const loadingMessage = document.getElementById('loadingMessage');
             const dynamicResultsContainer = document.getElementById('dynamicResultsContainer');
 
-            dynamicResultsContainer.innerHTML = ''; // Limpiar resultados anteriores
+            dynamicResultsContainer.innerHTML = '';
             errorMessage.style.display = 'none';
 
-            // Validar que se ha seleccionado o introducido una estación válida
-            // Se comprueba que se haya extraído un código y que este código exista en nuestra lista de estaciones
             if (!stationCode || !stationCodes[stationCode]) {
                 errorMessage.textContent = 'Por favor, selecciona una estación válida de la lista.';
                 errorMessage.style.display = 'block';
@@ -285,7 +273,6 @@
             for (const destStation of targetDestinations) {
                 const apiDestCode = destStation.code;
                 const apiDestName = destStation.name;
-                // La URL de la API se mantiene igual
                 const url = `https://api.metrobilbao.eus/metro/real-time/${stationCode}/${apiDestCode}`;
 
                 const destinationSection = document.createElement('div');
@@ -336,10 +323,9 @@
                             const wagonsCell = row.insertCell(1);
                             const directionCell = row.insertCell(2);
 
-                            // Pasa ambos valores a formatTime: estimated (minutos) y timerounded (cadena "HH:MM")
+                            // Pasa ambos valores a formatTime: estimated (número de minutos) y timerounded (cadena "HH:MM")
                             timeCell.textContent = formatTime(train.estimated, train.timerounded);
                             wagonsCell.textContent = train.wagons || 'N/A';
-                            // Asegurarse de que 'direction' de la API se mapee correctamente
                             directionCell.textContent = stationCodes[getStationCodeFromInput(train.direction)] || train.direction;
                         });
                     } else {
@@ -353,8 +339,8 @@
             loadingMessage.style.display = 'none';
         }
 
-        // Función formatTime modificada para aceptar timeEstimated (minutos) y timeRoundedString ("HH:MM")
-        function formatTime(timeEstimated, timeRoundedString) {
+        // Función formatTime modificada para aceptar timeEstimated (minutos) y timeRounded (cadena "HH:MM")
+        function formatTime(timeEstimated, timeRounded) {
             const formatMinutesToText = (minutes) => {
                 if (minutes === 0) {
                     return 'En estación';
@@ -371,13 +357,12 @@
 
             const estimatedText = formatMinutesToText(timeEstimated);
 
-            // timeRoundedString ya es la cadena de la hora (ej: "7:54").
-            // Eliminamos comillas dobles si por alguna razón la API las devolviera así, aunque JSON.parse
-            // del fetch ya se encargaría de esto normalmente.
-            const roundedTimeClean = timeRoundedString ? timeRoundedString.replace(/"/g, '') : 'N/A';
+            // timeRounded es la cadena de la hora (ej: "07:51").
+            // Si timeRounded es undefined, null, o una cadena vacía, mostramos "N/A".
+            const roundedTimeText = (timeRounded && timeRounded !== "") ? timeRounded : 'N/A';
 
             // Formato final: "estimated (timerounded)"
-            return `${estimatedText} (${roundedTimeClean})`;
+            return `${estimatedText} (${roundedTimeText})`;
         }
     </script>
 </body>
