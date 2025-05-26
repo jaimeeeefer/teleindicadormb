@@ -133,7 +133,7 @@
     </div>
 
     <script>
-        // Definimos las estaciones en el orden lineal que me has proporcionado
+        // Definimos las estaciones en el orden lineal correcto
         const stationOrder = [
             { code: "PLE", name: "Plentzia" },
             { code: "URD", name: "Urduliz" },
@@ -144,8 +144,8 @@
             { code: "BID", name: "Bidezabal" },
             { code: "ALG", name: "Algorta" },
             { code: "AIB", name: "Aiboa" },
-            { code: "NEG", name: "Neguri" },
-            { code: "GOB", name: "Gobela" },
+            { code: "NEG", name: "Neguri" }, // Reubicada
+            { code: "GOB", name: "Gobela" }, // Reubicada
             { code: "ARE", name: "Areeta" },
             { code: "LAM", name: "Lamiako" },
             { code: "LEI", name: "Leioa" },
@@ -179,34 +179,53 @@
             { code: "BSR", name: "Basauri" }
         ];
 
+        // Mapeo para búsqueda rápida de nombres de estación por código y viceversa
         const stationCodes = {};
+        const stationNames = {}; // Nuevo mapeo para buscar códigos por nombre
         stationOrder.forEach(station => {
             stationCodes[station.code] = station.name;
+            stationNames[station.name.toLowerCase()] = station.code; // Guarda el nombre en minúsculas
         });
 
+        // Función para poblar el datalist de estaciones al cargar la página
         function populateStationDatalist() {
             const datalistElement = document.getElementById('stationList');
+            // Limpiar datalist por si acaso ya tiene opciones (aunque DOMContentLoaded lo evita)
+            datalistElement.innerHTML = ''; 
             stationOrder.forEach(station => {
                 const option = document.createElement('option');
-                option.value = `${station.name} (${station.code})`;
+                option.value = `${station.name} (${station.code})`; // Formato visible en el datalist
                 datalistElement.appendChild(option);
             });
         }
 
         document.addEventListener('DOMContentLoaded', populateStationDatalist);
 
+        // Función mejorada para extraer el código de la estación del valor del input
         function getStationCodeFromInput(inputValue) {
+            // 1. Intentar extraer el código del patrón "(CÓDIGO)"
             const match = inputValue.match(/\(([A-Z]+)\)$/);
             if (match && match[1]) {
-                return match[1];
-            }
-            // Si el usuario escribe solo el nombre, intentamos encontrar el código
-            for (const code in stationCodes) {
-                if (stationCodes[code].toLowerCase() === inputValue.toLowerCase()) {
+                const code = match[1];
+                if (stationCodes[code]) { // Verificar si el código existe en nuestra lista
                     return code;
                 }
             }
-            return null;
+
+            // 2. Si no se encuentra el patrón, buscar por el nombre de la estación
+            // Eliminar el posible "(CÓDIGO)" para solo tener el nombre
+            const cleanName = inputValue.replace(/\s*\([A-Z]+\)$/, '').trim();
+            const codeByName = stationNames[cleanName.toLowerCase()];
+            if (codeByName) { // Si se encuentra por nombre
+                return codeByName;
+            }
+            
+            // 3. Si el input es solo el código (ej. "ABA")
+            if (stationCodes[inputValue.toUpperCase()]) {
+                return inputValue.toUpperCase();
+            }
+
+            return null; // Si no se encuentra un código válido
         }
 
         // Función para obtener las estaciones de destino relevantes
@@ -220,112 +239,69 @@
 
             // Casos especiales de bifurcación o terminal
             switch (currentStationCode) {
-                case "LUT": // Lutxana: Puede ir hacia Erandio (L1/L2) o San Ignazio (L1/L2)
+                case "LUT": // Lutxana: Conecta con Erandio y San Ignazio
                     neighbors.push({ code: "ERA", name: "Erandio" });
                     neighbors.push({ code: "SIN", name: "San Ignazio" });
                     break;
-                case "AST": // Astrabudua: Puede ir hacia Leioa o Erandio
+                case "AST": // Astrabudua: Conecta con Leioa y Erandio
                     neighbors.push({ code: "LEI", name: "Leioa" });
                     neighbors.push({ code: "ERA", name: "Erandio" });
                     break;
-                case "ERA": // Erandio: Puede ir hacia Astrabudua o Lutxana
+                case "ERA": // Erandio: Conecta con Astrabudua y Lutxana
                     neighbors.push({ code: "AST", name: "Astrabudua" });
                     neighbors.push({ code: "LUT", name: "Lutxana" });
                     break;
-                case "KAB": // Kabiezes: Es una terminal, solo tiene una dirección real hacia Santurtzi
+                case "KAB": // Kabiezes: Terminal de L2, solo hacia Santurtzi
                     neighbors.push({ code: "STZ", name: "Santurtzi" });
                     break;
-                case "BSR": // Basauri: Es una terminal, solo tiene una dirección real hacia Ariz
+                case "BSR": // Basauri: Terminal de L2, solo hacia Ariz
                     neighbors.push({ code: "ARZ", name: "Ariz" });
                     break;
-                case "PLE": // Plentzia: Es una terminal, solo tiene una dirección real hacia Urduliz
+                case "PLE": // Plentzia: Terminal de L1, solo hacia Urduliz
                     neighbors.push({ code: "URD", name: "Urduliz" });
                     break;
-                case "SIN": // San Ignazio: Es el punto de unión/separación clave
-                    // L1: hacia Sarriko (centro) y hacia Deustu si viene del otro lado
-                    // L2: hacia Gurutzeta/Cruces (Margen Izquierda) y hacia Lutxana
-                    
-                    // Si San Ignazio es la estación actual, queremos ver trenes hacia sus vecinos:
-                    // Hacia Sarriko (tronco común)
-                    neighbors.push({ code: "SAR", name: "Sarriko" });
-                    // Hacia Gurutzeta/Cruces (L2)
-                    neighbors.push({ code: "GUR", name: "Gurutzeta / Cruces" });
-                    // Hacia Lutxana (L1)
-                    neighbors.push({ code: "LUT", name: "Lutxana" });
+                case "SIN": // San Ignazio: Punto de unión/separación clave (L1/L2)
+                    neighbors.push({ code: "SAR", name: "Sarriko" });         // Tronco común hacia el centro
+                    neighbors.push({ code: "GUR", name: "Gurutzeta / Cruces" }); // L2 hacia Margen Izquierda
+                    neighbors.push({ code: "LUT", name: "Lutxana" });         // L1/L2 hacia Margen Derecha / Plentzia (tramo compartido con L1)
                     break;
-                
+                // Casos especiales para el segmento AIB-NEG-GOB-ARE que pueden estar "fuera de orden" lineal estricto en la lista
+                // La lista proporcionada los tiene contiguos, así que el default debería funcionar para la mayoría.
+                // Si hay un caso donde el vecino directo en la API no es el siguiente/anterior en esta lista,
+                // habría que añadirlo aquí explícitamente.
+                // Ejemplo: Si desde Algorta se puede ir a Bidezabal y Aiboa, y también a Neguri (si el tren lo permite).
+                // Pero por ahora, asumimos que el orden lineal representa el flujo normal del tren.
                 default:
                     // Para la mayoría de estaciones lineales: un anterior y un siguiente
-                    const prevStation = stationOrder[index - 1];
-                    const nextStation = stationOrder[index + 1];
-
-                    // Determinar el flujo para evitar ir a estaciones "detrás" de la bifurcación principal
-                    // Esto es una simplificación; la API de Metro Bilbao gestiona la lógica de rutas.
-                    // Aquí simplemente le damos los vecinos directos según nuestro orden lineal.
-
-                    if (prevStation) {
-                        // Consideramos la estación anterior si no es un punto de bifurcación "problemático"
-                        // o si estamos en un tramo común donde el anterior es siempre un destino válido.
-                        if (!['SIN'].includes(prevStation.code)) { // No añadir SIN si es "anterior" y podría llevar a un bucle lógico no deseado para consultas
+                    if (index > 0) {
+                        const prevStation = stationOrder[index - 1];
+                        // Evitar añadir un 'vecino' que sabemos que es un punto de bifurcación
+                        // y que ya se ha manejado explícitamente para evitar redundancias
+                        // o direcciones ilógicas si la API no lo soporta.
+                        if (!['SIN', 'LUT', 'AST', 'ERA'].includes(prevStation.code)) {
                             neighbors.push(prevStation);
                         }
                     }
-                    if (nextStation) {
-                        // Consideramos la estación siguiente
-                        if (!['SIN'].includes(nextStation.code)) {
+                    if (index < stationOrder.length - 1) {
+                        const nextStation = stationOrder[index + 1];
+                        if (!['SIN', 'LUT', 'AST', 'ERA'].includes(nextStation.code)) {
                             neighbors.push(nextStation);
                         }
                     }
-
-                    // Lógica adicional para asegurar que se consulten destinos "sensatos" desde puntos no-bifurcación
-                    // Esto es una capa de seguridad para evitar consultas a destinos que no existen o son ilógicos.
-                    // La API de Metro Bilbao ya debería manejar esto, pero mejor ser explícitos.
-                    if (currentStationCode === "IND") { // Indautxu -> puede ir a Moyua o Santimami
-                        if (!neighbors.some(n => n.code === "MOY")) neighbors.push({code: "MOY", name: "Moyua"});
-                        if (!neighbors.some(n => n.code === "SAM")) neighbors.push({code: "SAM", name: "Santimami / San Mamés"});
-                    }
-                    if (currentStationCode === "MOY") { // Moyua -> puede ir a Abando o Indautxu
-                        if (!neighbors.some(n => n.code === "ABA")) neighbors.push({code: "ABA", name: "Abando"});
-                        if (!neighbors.some(n => n.code === "IND")) neighbors.push({code: "IND", name: "Indautxu"});
-                    }
-                    // Y así sucesivamente para estaciones donde el 'orden lineal' no garantiza vecinos lógicos
-                    // para la API real-time en ambos sentidos.
-                    // Sin una lista completa de rutas de la API, es difícil simularlo perfectamente.
-                    // Lo mejor es que la API de Metro Bilbao se encargue de la validación del destino.
-                    // Si un par (origen, destino) no es válido, la API debería devolver 404/error.
-                    
-                    // La lógica por defecto de `getNeighboringStations` simplemente busca el anterior y el siguiente
-                    // en la lista `stationOrder`. Si la lista no representa la linealidad de la ruta,
-                    // esta función debe ser más inteligente.
-                    
-                    // Para evitar duplicados o errores con la lógica 'prev/next' en puntos complejos,
-                    // es mejor ser explícito para los puntos de bifurcación y terminales como se hizo arriba.
-                    // Para el resto, el orden lineal debería ser suficiente si están en un tramo "recto".
-
-                    // Añadimos una verificación para que no se dupliquen vecinos si ya se añadieron
-                    // por la lógica del switch o por la linealidad.
-                    const uniqueNeighbors = [];
-                    const neighborCodes = new Set();
-                    neighbors.forEach(n => {
-                        if (!neighborCodes.has(n.code)) {
-                            uniqueNeighbors.push(n);
-                            neighborCodes.add(n.code);
-                        }
-                    });
-                    return uniqueNeighbors;
+                    break;
             }
-            // Aseguramos que no haya duplicados si las lógicas anteriores agregaron lo mismo
-            const finalNeighbors = [];
-            const seenCodes = new Set();
+            
+            // Eliminar posibles duplicados
+            const uniqueNeighbors = [];
+            const neighborCodes = new Set();
             neighbors.forEach(n => {
-                if (!seenCodes.has(n.code)) {
-                    finalNeighbors.push(n);
-                    seenCodes.add(n.code);
+                if (!neighborCodes.has(n.code)) {
+                    uniqueNeighbors.push(n);
+                    neighborCodes.add(n.code);
                 }
             });
-            return finalNeighbors;
+            return uniqueNeighbors;
         }
-
 
         async function consultarTrenes() {
             const stationInput = document.getElementById('stationInput');
@@ -336,18 +312,18 @@
             const loadingMessage = document.getElementById('loadingMessage');
             const dynamicResultsContainer = document.getElementById('dynamicResultsContainer');
 
-            dynamicResultsContainer.innerHTML = '';
+            dynamicResultsContainer.innerHTML = ''; // Limpiar resultados anteriores
             errorMessage.style.display = 'none';
 
+            // Validar que se ha seleccionado o introducido una estación válida
             if (!stationCode || !stationCodes[stationCode]) {
-                errorMessage.textContent = 'Por favor, selecciona una estación válida de la lista.';
+                errorMessage.textContent = 'Por favor, selecciona una estación válida de la lista o escribe el nombre completo.';
                 errorMessage.style.display = 'block';
                 return;
             }
 
             loadingMessage.style.display = 'block';
 
-            // Obtener las estaciones a las que se puede viajar desde la estación seleccionada
             const targetDestinations = getNeighboringStations(stationCode);
 
             if (targetDestinations.length === 0) {
@@ -357,8 +333,7 @@
                 return;
             }
 
-            // Usamos Promise.all para hacer todas las llamadas a la API en paralelo
-            // y luego procesar los resultados una vez que todas han terminado.
+            // Usar Promise.all para hacer todas las llamadas a la API en paralelo
             const fetchPromises = targetDestinations.map(async (destStation) => {
                 const apiDestCode = destStation.code;
                 const apiDestName = destStation.name;
@@ -370,8 +345,6 @@
                 try {
                     const response = await fetch(url);
                     if (!response.ok) {
-                        // Si la API responde con un error (ej. 404 para una ruta inválida),
-                        // lo tratamos como "no hay trenes" para esa dirección.
                         console.warn(`API respondió con estado ${response.status} para ${stationCode} hacia ${apiDestCode}.`);
                         hasError = true;
                     } else {
@@ -389,12 +362,10 @@
                 };
             });
 
-            // Esperar a que todas las promesas se resuelvan
             const allResults = await Promise.all(fetchPromises);
 
             let anyTrainFound = false;
 
-            // Procesar y mostrar los resultados
             allResults.forEach(({ destStation, trainData, hasError }) => {
                 const apiDestName = destStation.name;
                 const apiDestCode = destStation.code;
@@ -425,7 +396,7 @@
                 const noTrainsP = document.createElement('p');
                 noTrainsP.style.fontStyle = 'italic';
                 noTrainsP.style.textAlign = 'center';
-                noTrainsP.style.display = 'none'; // Por defecto oculto
+                noTrainsP.style.display = 'none';
                 noTrainsP.textContent = `No hay trenes próximos hacia ${apiDestName}.`;
                 destinationSection.appendChild(noTrainsP);
 
@@ -438,9 +409,52 @@
 
                         timeCell.textContent = formatTime(train.estimated, train.timeRounded);
                         wagonsCell.textContent = train.wagons || 'N/A';
-                        // La API en 'direction' puede devolver el nombre de la estación o el código.
-                        // Usamos stationCodes[code] si es un código, si no, el valor directo.
-                        const finalDirectionCode = getStationCodeFromInput(train.direction); // Intenta extraer el código
+                        
+                        // Determinar el nombre de la estación de destino real
+                        const finalDirectionCode = getStationCodeFromInput(train.direction); 
                         directionCell.textContent = finalDirectionCode ? stationCodes[finalDirectionCode] : train.direction;
                     });
-                
+                    anyTrainFound = true;
+                } else {
+                    noTrainsP.style.display = 'block';
+                }
+            });
+
+            loadingMessage.style.display = 'none';
+
+            // Mensaje general si no se encontró NINGÚN tren en ninguna dirección
+            if (!anyTrainFound && allResults.length > 0) {
+                const generalNoTrainsP = document.createElement('p');
+                generalNoTrainsP.classList.add('error');
+                generalNoTrainsP.textContent = 'No se encontraron trenes próximos en ninguna dirección para esta estación.';
+                if (dynamicResultsContainer.children.length === 0) { 
+                    dynamicResultsContainer.appendChild(generalNoTrainsP);
+                }
+            }
+        }
+
+        function formatTime(timeEstimated, timeRounded) {
+            const formatMinutesToText = (minutes) => {
+                if (minutes === 0) {
+                    return 'En estación';
+                } else if (minutes === 1) {
+                    return '1 minuto';
+                } else if (minutes < 60) {
+                    return `${minutes} minutos`;
+                } else {
+                    const hours = Math.floor(minutes / 60);
+                    const remainingMinutes = minutes % 60;
+                    return `${hours}h ${remainingMinutes}min`;
+                }
+            };
+
+            const estimatedText = formatMinutesToText(timeEstimated);
+
+            // Aseguramos que timeRounded sea una cadena válida o 'N/A'
+            const roundedTimeText = (typeof timeRounded === 'string' && timeRounded.trim() !== '') ? timeRounded.trim() : 'N/A';
+
+            return `${estimatedText} (${roundedTimeText})`;
+        }
+    </script>
+</body>
+</html>
