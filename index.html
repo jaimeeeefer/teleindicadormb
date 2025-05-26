@@ -190,7 +190,7 @@
             stationOrder.forEach(station => {
                 const option = document.createElement('option');
                 // Mostrar nombre (código) para que el usuario lo vea
-                option.value = `${station.name} (${station.code})`; 
+                option.value = `${station.name} (${station.code})`;
                 datalistElement.appendChild(option);
             });
         }
@@ -200,9 +200,9 @@
         // Función para extraer el código de la estación del valor del input
         function getStationCodeFromInput(inputValue) {
             // Intenta extraer el código entre paréntesis al final (ej. "ABA")
-            const match = inputValue.match(/\(([A-Z]+)\)$/); 
+            const match = inputValue.match(/\(([A-Z]+)\)$/);
             if (match && match[1]) {
-                return match[1]; 
+                return match[1];
             }
             // Si no se encuentra el formato (Nombre (CÓDIGO)), intenta buscar por el nombre exacto
             for (const code in stationCodes) {
@@ -252,14 +252,14 @@
         async function consultarTrenes() {
             const stationInput = document.getElementById('stationInput');
             // Obtener el valor del input y eliminar espacios en blanco
-            const selectedStationValue = stationInput.value.trim(); 
+            const selectedStationValue = stationInput.value.trim();
             // Extraer el código de la estación a partir del valor del input
-            const stationCode = getStationCodeFromInput(selectedStationValue); 
-            
+            const stationCode = getStationCodeFromInput(selectedStationValue);
+
             const errorMessage = document.getElementById('errorMessage');
             const loadingMessage = document.getElementById('loadingMessage');
             const dynamicResultsContainer = document.getElementById('dynamicResultsContainer');
-            
+
             dynamicResultsContainer.innerHTML = ''; // Limpiar resultados anteriores
             errorMessage.style.display = 'none';
 
@@ -287,7 +287,7 @@
                 const apiDestName = destStation.name;
                 // La URL de la API se mantiene igual
                 const url = `https://api.metrobilbao.eus/metro/real-time/${stationCode}/${apiDestCode}`;
-                
+
                 const destinationSection = document.createElement('div');
                 destinationSection.classList.add('dynamic-results-section');
                 dynamicResultsContainer.appendChild(destinationSection);
@@ -320,15 +320,15 @@
 
                 try {
                     const response = await fetch(url);
-                    
+
                     if (!response.ok) {
                         console.warn(`API respondió con estado ${response.status} para ${stationCode} hacia ${apiDestCode}. Tratando como no hay trenes disponibles.`);
                         noTrainsP.style.display = 'block';
                         continue;
                     }
-                    
+
                     const data = await response.json();
-                    
+
                     if (data && data.trains && data.trains.length > 0) {
                         data.trains.forEach(train => {
                             const row = tbody.insertRow();
@@ -347,7 +347,7 @@
                     }
                 } catch (error) {
                     console.error(`Error de red o parsing para ${apiDestCode}:`, error);
-                    noTrainsP.style.display = 'block'; 
+                    noTrainsP.style.display = 'block';
                 }
             }
             loadingMessage.style.display = 'none';
@@ -368,14 +368,14 @@
                     return `${hours}h ${remainingMinutes}min`;
                 }
             };
-            
+
             const estimatedText = formatMinutesToText(timeEstimated);
-            
+
             // timeRoundedString ya es la cadena de la hora (ej: "7:54").
             // Eliminamos comillas dobles si por alguna razón la API las devolviera así, aunque JSON.parse
             // del fetch ya se encargaría de esto normalmente.
             const roundedTimeClean = timeRoundedString ? timeRoundedString.replace(/"/g, '') : 'N/A';
-            
+
             // Formato final: "estimated (timerounded)"
             return `${estimatedText} (${roundedTimeClean})`;
         }
