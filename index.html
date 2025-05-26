@@ -39,15 +39,14 @@
             font-weight: bold;
             color: #555;
         }
-        select {
+        /* Estilo para el input del datalist */
+        input[type="text"] {
             padding: 12px;
             border: 1px solid #ccc;
             border-radius: 5px;
             font-size: 1em;
             width: 100%;
             box-sizing: border-box;
-            background-color: white; /* Asegura el fondo blanco en el desplegable */
-            cursor: pointer;
         }
         button {
             background-color: #d10000; /* Color de Metro Bilbao */
@@ -117,8 +116,9 @@
     <div class="container">
         <h1>Teleindicador Metro Bilbao</h1>
         <div class="input-section">
-            <label for="stationSelect">Selecciona una estación:</label>
-            <select id="stationSelect"></select>
+            <label for="stationInput">Selecciona o busca una estación:</label>
+            <input type="text" id="stationInput" list="stationList" placeholder="Escribe para buscar...">
+            <datalist id="stationList"></datalist>
             <button onclick="consultarTrenes()">Consultar Trenes</button>
         </div>
     </div>
@@ -133,7 +133,6 @@
     </div>
 
     <script>
-        // Definimos las estaciones en el orden lineal, con la corrección de Erandio/Astrabudua
         const stationOrder = [
             { code: "PLE", name: "Plentzia" },
             { code: "URD", name: "Urduliz" },
@@ -149,8 +148,8 @@
             { code: "ARE", name: "Areeta" },
             { code: "LAM", name: "Lamiako" },
             { code: "LEI", name: "Leioa" },
-            { code: "AST", name: "Astrabudua" }, // Corregido: Astrabudua antes de Erandio en este orden
-            { code: "ERA", name: "Erandio" },     // Corregido
+            { code: "AST", name: "Astrabudua" },
+            { code: "ERA", name: "Erandio" },
             { code: "LUT", name: "Lutxana" },
             { code: "KAB", name: "Kabiezes" },
             { code: "STZ", name: "Santurtzi" },
@@ -179,80 +178,77 @@
             { code: "BSR", name: "Basauri" }
         ];
 
-        // Mapeo para búsqueda rápida de nombres de estación por código
         const stationCodes = {};
         stationOrder.forEach(station => {
             stationCodes[station.code] = station.name;
         });
 
-        // Función para poblar el desplegable de estaciones al cargar la página
-        function populateStationSelect() {
-            const selectElement = document.getElementById('stationSelect');
-            const defaultOption = document.createElement('option');
-            defaultOption.value = "";
-            defaultOption.textContent = "Selecciona una estación...";
-            selectElement.appendChild(defaultOption);
-
+        // Función para poblar el datalist de estaciones al cargar la página
+        function populateStationDatalist() {
+            const datalistElement = document.getElementById('stationList');
             stationOrder.forEach(station => {
                 const option = document.createElement('option');
-                option.value = station.code;
-                option.textContent = `${station.name} (${station.code})`;
-                selectElement.appendChild(option);
+                option.value = `${station.name} (${station.code})`; // Mostrar nombre (código)
+                option.dataset.code = station.code; // Almacenar el código en un data-attribute
+                datalistElement.appendChild(option);
             });
         }
 
-        document.addEventListener('DOMContentLoaded', populateStationSelect);
+        document.addEventListener('DOMContentLoaded', populateStationDatalist);
 
-        // Función para mapear el nombre de la dirección al código (si es posible)
         function getStationCodeFromName(name) {
+            // Esta función ahora buscará el código a partir del nombre completo (Nombre (CÓDIGO))
+            const match = name.match(/\(([A-Z]+)\)$/); // Busca el código entre paréntesis al final
+            if (match && match[1]) {
+                return match[1];
+            }
+            // Si el formato no coincide, intenta buscar por el nombre directamente en el mapeo
             for (const code in stationCodes) {
                 if (stationCodes[code].toLowerCase() === name.toLowerCase()) {
                     return code;
                 }
             }
-            return name;
+            return name; // Si no encuentra, devuelve el nombre tal cual
         }
 
-        // Función para obtener las estaciones anterior y siguiente (o las rutas específicas)
         function getNeighboringStations(currentStationCode) {
             const neighbors = [];
             const index = stationOrder.findIndex(s => s.code === currentStationCode);
 
             if (index === -1) {
-                return []; // Estación no encontrada
+                return [];
             }
 
-            // Lógica para estaciones con reglas especiales
-            if (currentStationCode === "LUT") { // Lutxana
-                neighbors.push({ code: "ERA", name: "Erandio" }); // Anterior
-                neighbors.push({ code: "SIN", name: "San Ignazio" }); // Siguiente
-            } else if (currentStationCode === "KAB") { // Kabiezes
-                neighbors.push({ code: "LUT", name: "Lutxana" }); // Anterior
-                // No hay siguiente en la lista lineal con la que tenga sentido directo para la API
-                // La API podría tener trenes hacia L2-Santurtzi o L2-Basauri/Etxebarri si esta es una terminal L2.
-                // Como indicaste que "siguiente si es Santurtzi", la incluimos como un posible destino lógico.
-                // La API determinará si hay trenes en esa dirección.
-                neighbors.push({ code: "STZ", name: "Santurtzi" });
-            } else if (currentStationCode === "SIN") { // San Ignazio
-                neighbors.push({ code: "GUR", name: "Gurutzeta / Cruces" }); // Anterior 1
-                neighbors.push({ code: "LUT", name: "Lutxana" }); // Anterior 2
-                neighbors.push({ code: "SAR", name: "Sarriko" }); // Siguiente
-            } else {
-                // Lógica general para la mayoría de estaciones
-                if (index > 0) {
-                    neighbors.push(stationOrder[index - 1]); // Anterior
-                }
-                if (index < stationOrder.length - 1) {
-                    neighbors.push(stationOrder[index + 1]); // Siguiente
-                }
+            switch (currentStationCode) {
+                case "LUT": // Lutxana
+                    neighbors.push({ code: "ERA", name: "Erandio" });
+                    neighbors.push({ code: "SIN", name: "San Ignazio" });
+                    break;
+                case "KAB": // Kabiezes (terminal)
+                    neighbors.push({ code: "STZ", name: "Santurtzi" });
+                    break;
+                case "SIN": // San Ignazio (bifurcación)
+                    neighbors.push({ code: "GUR", name: "Gurutzeta / Cruces" });
+                    neighbors.push({ code: "LUT", name: "Lutxana" });
+                    neighbors.push({ code: "SAR", name: "Sarriko" });
+                    break;
+                default:
+                    if (index > 0) {
+                        neighbors.push(stationOrder[index - 1]);
+                    }
+                    if (index < stationOrder.length - 1) {
+                        neighbors.push(stationOrder[index + 1]);
+                    }
+                    break;
             }
             return neighbors;
         }
 
-
         async function consultarTrenes() {
-            const stationSelect = document.getElementById('stationSelect');
-            const stationCode = stationSelect.value;
+            const stationInput = document.getElementById('stationInput');
+            const selectedStationValue = stationInput.value; // Obtiene el valor del input (ej. "Abando (ABA)")
+            const stationCode = getStationCodeFromName(selectedStationValue); // Extrae el código
+            
             const errorMessage = document.getElementById('errorMessage');
             const loadingMessage = document.getElementById('loadingMessage');
             const dynamicResultsContainer = document.getElementById('dynamicResultsContainer');
@@ -260,8 +256,9 @@
             dynamicResultsContainer.innerHTML = '';
             errorMessage.style.display = 'none';
 
-            if (!stationCode) {
-                errorMessage.textContent = 'Por favor, selecciona una estación.';
+            // Validar que se ha seleccionado o introducido una estación válida
+            if (!stationCode || !stationCodes[stationCode]) {
+                errorMessage.textContent = 'Por favor, selecciona una estación válida de la lista.';
                 errorMessage.style.display = 'block';
                 return;
             }
@@ -279,7 +276,7 @@
 
             for (const destStation of targetDestinations) {
                 const apiDestCode = destStation.code;
-                const apiDestName = destStation.name; // Usamos el nombre de la estación para el título
+                const apiDestName = destStation.name;
                 const url = `https://api.metrobilbao.eus/metro/real-time/${stationCode}/${apiDestCode}`;
                 
                 const destinationSection = document.createElement('div');
@@ -330,7 +327,7 @@
                             const wagonsCell = row.insertCell(1);
                             const directionCell = row.insertCell(2);
 
-                            timeCell.textContent = formatTime(train.estimated);
+                            timeCell.textContent = formatTime(train.timerounded, train.estimated);
                             wagonsCell.textContent = train.wagons || 'N/A';
                             directionCell.textContent = stationCodes[getStationCodeFromName(train.direction)] || train.direction;
                         });
@@ -345,18 +342,26 @@
             loadingMessage.style.display = 'none';
         }
 
-        function formatTime(timeInMinutes) {
-            if (timeInMinutes === 0) {
-                return 'En estación';
-            } else if (timeInMinutes === 1) {
-                return '1 minuto';
-            } else if (timeInMinutes < 60) {
-                return `${timeInMinutes} minutos`;
-            } else {
-                const hours = Math.floor(timeInMinutes / 60);
-                const minutes = timeInMinutes % 60;
-                return `${hours}h ${minutes}min`;
-            }
+        // Función formatTime modificada para aceptar timerounded y estimated
+        function formatTime(timeRounded, timeEstimated) {
+            const formatMinutes = (minutes) => {
+                if (minutes === 0) {
+                    return 'En estación';
+                } else if (minutes === 1) {
+                    return '1 minuto';
+                } else if (minutes < 60) {
+                    return `${minutes} minutos`;
+                } else {
+                    const hours = Math.floor(minutes / 60);
+                    const remainingMinutes = minutes % 60;
+                    return `${hours}h ${remainingMinutes}min`;
+                }
+            };
+            
+            const roundedText = formatMinutes(timeRounded);
+            const estimatedText = formatMinutes(timeEstimated);
+            
+            return `${roundedText} (${estimatedText})`;
         }
     </script>
 </body>
