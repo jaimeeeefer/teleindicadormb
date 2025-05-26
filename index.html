@@ -189,9 +189,8 @@
             const datalistElement = document.getElementById('stationList');
             stationOrder.forEach(station => {
                 const option = document.createElement('option');
-                option.value = `${station.name} (${station.code})`; // Mostrar nombre (código)
-                // No es estrictamente necesario data-code aquí, pero lo mantenemos como buena práctica
-                option.dataset.code = station.code; 
+                // Mostrar nombre (código) para que el usuario lo vea
+                option.value = `${station.name} (${station.code})`; 
                 datalistElement.appendChild(option);
             });
         }
@@ -200,12 +199,12 @@
 
         // Función para extraer el código de la estación del valor del input
         function getStationCodeFromInput(inputValue) {
-            const match = inputValue.match(/\(([A-Z]+)\)$/); // Busca el código entre paréntesis al final
+            // Intenta extraer el código entre paréntesis al final (ej. "ABA")
+            const match = inputValue.match(/\(([A-Z]+)\)$/); 
             if (match && match[1]) {
-                return match[1]; // Retorna el código (ej: "ABA")
+                return match[1]; 
             }
-            // Si el formato no coincide, puede ser que el usuario solo haya escrito el nombre o parte de él.
-            // En este caso, intentamos buscar el código por el nombre en el mapa.
+            // Si no se encuentra el formato (Nombre (CÓDIGO)), intenta buscar por el nombre exacto
             for (const code in stationCodes) {
                 if (stationCodes[code].toLowerCase() === inputValue.toLowerCase()) {
                     return code;
@@ -252,8 +251,10 @@
 
         async function consultarTrenes() {
             const stationInput = document.getElementById('stationInput');
-            const selectedStationValue = stationInput.value.trim(); // Obtiene el valor del input y elimina espacios
-            const stationCode = getStationCodeFromInput(selectedStationValue); // Extrae el código
+            // Obtener el valor del input y eliminar espacios en blanco
+            const selectedStationValue = stationInput.value.trim(); 
+            // Extraer el código de la estación a partir del valor del input
+            const stationCode = getStationCodeFromInput(selectedStationValue); 
             
             const errorMessage = document.getElementById('errorMessage');
             const loadingMessage = document.getElementById('loadingMessage');
@@ -263,6 +264,7 @@
             errorMessage.style.display = 'none';
 
             // Validar que se ha seleccionado o introducido una estación válida
+            // Se comprueba que se haya extraído un código y que este código exista en nuestra lista de estaciones
             if (!stationCode || !stationCodes[stationCode]) {
                 errorMessage.textContent = 'Por favor, selecciona una estación válida de la lista.';
                 errorMessage.style.display = 'block';
@@ -283,6 +285,7 @@
             for (const destStation of targetDestinations) {
                 const apiDestCode = destStation.code;
                 const apiDestName = destStation.name;
+                // La URL de la API se mantiene igual
                 const url = `https://api.metrobilbao.eus/metro/real-time/${stationCode}/${apiDestCode}`;
                 
                 const destinationSection = document.createElement('div');
@@ -333,9 +336,10 @@
                             const wagonsCell = row.insertCell(1);
                             const directionCell = row.insertCell(2);
 
-                            // Pasa ambos valores a formatTime
+                            // Pasa ambos valores a formatTime: estimated (minutos) y timerounded (cadena "HH:MM")
                             timeCell.textContent = formatTime(train.estimated, train.timerounded);
                             wagonsCell.textContent = train.wagons || 'N/A';
+                            // Asegurarse de que 'direction' de la API se mapee correctamente
                             directionCell.textContent = stationCodes[getStationCodeFromInput(train.direction)] || train.direction;
                         });
                     } else {
@@ -349,9 +353,9 @@
             loadingMessage.style.display = 'none';
         }
 
-        // Función formatTime modificada para aceptar estimated y timerounded
+        // Función formatTime modificada para aceptar timeEstimated (minutos) y timeRoundedString ("HH:MM")
         function formatTime(timeEstimated, timeRoundedString) {
-            const formatMinutes = (minutes) => {
+            const formatMinutesToText = (minutes) => {
                 if (minutes === 0) {
                     return 'En estación';
                 } else if (minutes === 1) {
@@ -365,13 +369,15 @@
                 }
             };
             
-            const estimatedText = formatMinutes(timeEstimated);
+            const estimatedText = formatMinutesToText(timeEstimated);
             
-            // timeRoundedString ya es la cadena de la hora (ej: "7:54"), la usamos directamente
-            // Eliminamos las comillas si las tuviera (aunque JSON.parse ya debería quitarlas)
-            const roundedTimeText = timeRoundedString.replace(/"/g, ''); 
+            // timeRoundedString ya es la cadena de la hora (ej: "7:54").
+            // Eliminamos comillas dobles si por alguna razón la API las devolviera así, aunque JSON.parse
+            // del fetch ya se encargaría de esto normalmente.
+            const roundedTimeClean = timeRoundedString ? timeRoundedString.replace(/"/g, '') : 'N/A';
             
-            return `${estimatedText} (${roundedTimeText})`;
+            // Formato final: "estimated (timerounded)"
+            return `${estimatedText} (${roundedTimeClean})`;
         }
     </script>
 </body>
