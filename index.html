@@ -133,6 +133,7 @@
     </div>
 
     <script>
+        // Definimos las estaciones en el orden lineal, con la corrección de Erandio/Astrabudua
         const stationOrder = [
             { code: "PLE", name: "Plentzia" },
             { code: "URD", name: "Urduliz" },
@@ -148,8 +149,8 @@
             { code: "ARE", name: "Areeta" },
             { code: "LAM", name: "Lamiako" },
             { code: "LEI", name: "Leioa" },
-            { code: "ERA", name: "Erandio" },
-            { code: "AST", name: "Astrabudua" },
+            { code: "AST", name: "Astrabudua" }, // Corregido: Astrabudua antes de Erandio en este orden
+            { code: "ERA", name: "Erandio" },     // Corregido
             { code: "LUT", name: "Lutxana" },
             { code: "KAB", name: "Kabiezes" },
             { code: "STZ", name: "Santurtzi" },
@@ -187,7 +188,6 @@
         // Función para poblar el desplegable de estaciones al cargar la página
         function populateStationSelect() {
             const selectElement = document.getElementById('stationSelect');
-            // Añadir una opción por defecto para "selecciona"
             const defaultOption = document.createElement('option');
             defaultOption.value = "";
             defaultOption.textContent = "Selecciona una estación...";
@@ -201,9 +201,7 @@
             });
         }
 
-        // Llamar a la función para poblar el desplegable cuando el DOM esté cargado
         document.addEventListener('DOMContentLoaded', populateStationSelect);
-
 
         // Función para mapear el nombre de la dirección al código (si es posible)
         function getStationCodeFromName(name) {
@@ -212,24 +210,43 @@
                     return code;
                 }
             }
-            return name; // Devuelve el nombre si no encuentra un código
+            return name;
         }
 
-        // Función para obtener las estaciones anterior y siguiente
+        // Función para obtener las estaciones anterior y siguiente (o las rutas específicas)
         function getNeighboringStations(currentStationCode) {
+            const neighbors = [];
             const index = stationOrder.findIndex(s => s.code === currentStationCode);
-            let prevStation = null;
-            let nextStation = null;
 
-            if (index !== -1) {
+            if (index === -1) {
+                return []; // Estación no encontrada
+            }
+
+            // Lógica para estaciones con reglas especiales
+            if (currentStationCode === "LUT") { // Lutxana
+                neighbors.push({ code: "ERA", name: "Erandio" }); // Anterior
+                neighbors.push({ code: "SIN", name: "San Ignazio" }); // Siguiente
+            } else if (currentStationCode === "KAB") { // Kabiezes
+                neighbors.push({ code: "LUT", name: "Lutxana" }); // Anterior
+                // No hay siguiente en la lista lineal con la que tenga sentido directo para la API
+                // La API podría tener trenes hacia L2-Santurtzi o L2-Basauri/Etxebarri si esta es una terminal L2.
+                // Como indicaste que "siguiente si es Santurtzi", la incluimos como un posible destino lógico.
+                // La API determinará si hay trenes en esa dirección.
+                neighbors.push({ code: "STZ", name: "Santurtzi" });
+            } else if (currentStationCode === "SIN") { // San Ignazio
+                neighbors.push({ code: "GUR", name: "Gurutzeta / Cruces" }); // Anterior 1
+                neighbors.push({ code: "LUT", name: "Lutxana" }); // Anterior 2
+                neighbors.push({ code: "SAR", name: "Sarriko" }); // Siguiente
+            } else {
+                // Lógica general para la mayoría de estaciones
                 if (index > 0) {
-                    prevStation = stationOrder[index - 1];
+                    neighbors.push(stationOrder[index - 1]); // Anterior
                 }
                 if (index < stationOrder.length - 1) {
-                    nextStation = stationOrder[index + 1];
+                    neighbors.push(stationOrder[index + 1]); // Siguiente
                 }
             }
-            return { prev: prevStation, next: nextStation };
+            return neighbors;
         }
 
 
@@ -251,32 +268,26 @@
 
             loadingMessage.style.display = 'block';
 
-            const { prev, next } = getNeighboringStations(stationCode);
-            const targetDestinations = [];
-
-            if (prev) {
-                targetDestinations.push(prev.code);
-            }
-            if (next) {
-                targetDestinations.push(next.code);
-            }
+            const targetDestinations = getNeighboringStations(stationCode);
 
             if (targetDestinations.length === 0) {
                 loadingMessage.style.display = 'none';
-                errorMessage.textContent = 'No se pudieron determinar las estaciones vecinas para esta estación.';
+                errorMessage.textContent = 'No se pudieron determinar las rutas para esta estación.';
                 errorMessage.style.display = 'block';
                 return;
             }
 
-            for (const apiDest of targetDestinations) {
-                const url = `https://api.metrobilbao.eus/metro/real-time/${stationCode}/${apiDest}`;
+            for (const destStation of targetDestinations) {
+                const apiDestCode = destStation.code;
+                const apiDestName = destStation.name; // Usamos el nombre de la estación para el título
+                const url = `https://api.metrobilbao.eus/metro/real-time/${stationCode}/${apiDestCode}`;
                 
                 const destinationSection = document.createElement('div');
                 destinationSection.classList.add('dynamic-results-section');
                 dynamicResultsContainer.appendChild(destinationSection);
 
                 const destinationTitle = document.createElement('h3');
-                destinationTitle.textContent = `Hacia ${stationCodes[apiDest] || apiDest}`;
+                destinationTitle.textContent = `Hacia ${apiDestName} (${apiDestCode})`;
                 destinationSection.appendChild(destinationTitle);
 
                 const table = document.createElement('table');
@@ -298,17 +309,16 @@
                 noTrainsP.style.fontStyle = 'italic';
                 noTrainsP.style.textAlign = 'center';
                 noTrainsP.style.display = 'none';
-                noTrainsP.textContent = `No hay trenes próximos hacia ${stationCodes[apiDest] || apiDest}.`;
+                noTrainsP.textContent = `No hay trenes próximos hacia ${apiDestName}.`;
                 destinationSection.appendChild(noTrainsP);
 
                 try {
                     const response = await fetch(url);
                     
-                    // Si la respuesta no es OK (ej. 404, 500, etc.), o no hay datos, lo tratamos como "no hay trenes"
                     if (!response.ok) {
-                        console.warn(`API responded with status ${response.status} for ${stationCode} towards ${apiDest}. Treating as no trains available.`);
+                        console.warn(`API respondió con estado ${response.status} para ${stationCode} hacia ${apiDestCode}. Tratando como no hay trenes disponibles.`);
                         noTrainsP.style.display = 'block';
-                        continue; // Pasar al siguiente destino
+                        continue;
                     }
                     
                     const data = await response.json();
@@ -325,17 +335,11 @@
                             directionCell.textContent = stationCodes[getStationCodeFromName(train.direction)] || train.direction;
                         });
                     } else {
-                        // Si la respuesta es OK pero el array 'trains' está vacío o no existe
                         noTrainsP.style.display = 'block';
                     }
                 } catch (error) {
-                    // Este catch se activará por errores de red (ej. sin conexión) o JSON malformado
-                    console.error(`Error de red o parsing para ${apiDest}:`, error);
-                    // Mostrar "No hay trenes próximos" en lugar de un error técnico para el usuario
+                    console.error(`Error de red o parsing para ${apiDestCode}:`, error);
                     noTrainsP.style.display = 'block'; 
-                    // Opcionalmente, puedes mostrar un mensaje de error general si prefieres:
-                    // errorMessage.textContent = `Hubo un problema de conexión al cargar datos para ${stationCodes[apiDest] || apiDest}.`;
-                    // errorMessage.style.display = 'block';
                 }
             }
             loadingMessage.style.display = 'none';
