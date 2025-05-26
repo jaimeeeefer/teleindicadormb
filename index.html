@@ -178,6 +178,7 @@
             { code: "BSR", name: "Basauri" }
         ];
 
+        // Mapeo para búsqueda rápida de nombres de estación por código
         const stationCodes = {};
         stationOrder.forEach(station => {
             stationCodes[station.code] = station.name;
@@ -189,71 +190,76 @@
             stationOrder.forEach(station => {
                 const option = document.createElement('option');
                 option.value = `${station.name} (${station.code})`; // Mostrar nombre (código)
-                option.dataset.code = station.code; // Almacenar el código en un data-attribute
+                // No es estrictamente necesario data-code aquí, pero lo mantenemos como buena práctica
+                option.dataset.code = station.code; 
                 datalistElement.appendChild(option);
             });
         }
 
         document.addEventListener('DOMContentLoaded', populateStationDatalist);
 
-        function getStationCodeFromName(name) {
-            // Esta función ahora buscará el código a partir del nombre completo (Nombre (CÓDIGO))
-            const match = name.match(/\(([A-Z]+)\)$/); // Busca el código entre paréntesis al final
+        // Función para extraer el código de la estación del valor del input
+        function getStationCodeFromInput(inputValue) {
+            const match = inputValue.match(/\(([A-Z]+)\)$/); // Busca el código entre paréntesis al final
             if (match && match[1]) {
-                return match[1];
+                return match[1]; // Retorna el código (ej: "ABA")
             }
-            // Si el formato no coincide, intenta buscar por el nombre directamente en el mapeo
+            // Si el formato no coincide, puede ser que el usuario solo haya escrito el nombre o parte de él.
+            // En este caso, intentamos buscar el código por el nombre en el mapa.
             for (const code in stationCodes) {
-                if (stationCodes[code].toLowerCase() === name.toLowerCase()) {
+                if (stationCodes[code].toLowerCase() === inputValue.toLowerCase()) {
                     return code;
                 }
             }
-            return name; // Si no encuentra, devuelve el nombre tal cual
+            return null; // Si no se encuentra un código válido
         }
 
+        // Función para obtener las estaciones de destino relevantes
         function getNeighboringStations(currentStationCode) {
             const neighbors = [];
             const index = stationOrder.findIndex(s => s.code === currentStationCode);
 
             if (index === -1) {
-                return [];
+                return []; // Estación no encontrada
             }
 
             switch (currentStationCode) {
                 case "LUT": // Lutxana
-                    neighbors.push({ code: "ERA", name: "Erandio" });
-                    neighbors.push({ code: "SIN", name: "San Ignazio" });
+                    neighbors.push({ code: "ERA", name: "Erandio" }); // Anterior en la línea 1/2
+                    neighbors.push({ code: "SIN", name: "San Ignazio" }); // Siguiente hacia la bifurcación L1/L2
                     break;
-                case "KAB": // Kabiezes (terminal)
-                    neighbors.push({ code: "STZ", name: "Santurtzi" });
+                case "KAB": // Kabiezes (terminal de la L2, solo tiene una dirección "siguiente")
+                    neighbors.push({ code: "STZ", name: "Santurtzi" }); // Hacia Santurtzi (siguiente lógica en la línea 2)
                     break;
-                case "SIN": // San Ignazio (bifurcación)
-                    neighbors.push({ code: "GUR", name: "Gurutzeta / Cruces" });
-                    neighbors.push({ code: "LUT", name: "Lutxana" });
-                    neighbors.push({ code: "SAR", name: "Sarriko" });
+                case "SIN": // San Ignazio (punto de bifurcación)
+                    neighbors.push({ code: "GUR", name: "Gurutzeta / Cruces" }); // Anterior (viene de L2)
+                    neighbors.push({ code: "LUT", name: "Lutxana" }); // Anterior (viene de L2)
+                    neighbors.push({ code: "SAR", name: "Sarriko" }); // Siguiente (hacia L1/L2 centro)
                     break;
                 default:
+                    // Lógica general para la mayoría de estaciones
                     if (index > 0) {
-                        neighbors.push(stationOrder[index - 1]);
+                        neighbors.push(stationOrder[index - 1]); // Anterior
                     }
                     if (index < stationOrder.length - 1) {
-                        neighbors.push(stationOrder[index + 1]);
+                        neighbors.push(stationOrder[index + 1]); // Siguiente
                     }
                     break;
             }
             return neighbors;
         }
 
+
         async function consultarTrenes() {
             const stationInput = document.getElementById('stationInput');
-            const selectedStationValue = stationInput.value; // Obtiene el valor del input (ej. "Abando (ABA)")
-            const stationCode = getStationCodeFromName(selectedStationValue); // Extrae el código
+            const selectedStationValue = stationInput.value.trim(); // Obtiene el valor del input y elimina espacios
+            const stationCode = getStationCodeFromInput(selectedStationValue); // Extrae el código
             
             const errorMessage = document.getElementById('errorMessage');
             const loadingMessage = document.getElementById('loadingMessage');
             const dynamicResultsContainer = document.getElementById('dynamicResultsContainer');
             
-            dynamicResultsContainer.innerHTML = '';
+            dynamicResultsContainer.innerHTML = ''; // Limpiar resultados anteriores
             errorMessage.style.display = 'none';
 
             // Validar que se ha seleccionado o introducido una estación válida
@@ -327,9 +333,10 @@
                             const wagonsCell = row.insertCell(1);
                             const directionCell = row.insertCell(2);
 
-                            timeCell.textContent = formatTime(train.timerounded, train.estimated);
+                            // Pasa ambos valores a formatTime
+                            timeCell.textContent = formatTime(train.estimated, train.timerounded);
                             wagonsCell.textContent = train.wagons || 'N/A';
-                            directionCell.textContent = stationCodes[getStationCodeFromName(train.direction)] || train.direction;
+                            directionCell.textContent = stationCodes[getStationCodeFromInput(train.direction)] || train.direction;
                         });
                     } else {
                         noTrainsP.style.display = 'block';
@@ -342,8 +349,8 @@
             loadingMessage.style.display = 'none';
         }
 
-        // Función formatTime modificada para aceptar timerounded y estimated
-        function formatTime(timeRounded, timeEstimated) {
+        // Función formatTime modificada para aceptar estimated y timerounded
+        function formatTime(timeEstimated, timeRoundedString) {
             const formatMinutes = (minutes) => {
                 if (minutes === 0) {
                     return 'En estación';
@@ -358,10 +365,13 @@
                 }
             };
             
-            const roundedText = formatMinutes(timeRounded);
             const estimatedText = formatMinutes(timeEstimated);
             
-            return `${roundedText} (${estimatedText})`;
+            // timeRoundedString ya es la cadena de la hora (ej: "7:54"), la usamos directamente
+            // Eliminamos las comillas si las tuviera (aunque JSON.parse ya debería quitarlas)
+            const roundedTimeText = timeRoundedString.replace(/"/g, ''); 
+            
+            return `${estimatedText} (${roundedTimeText})`;
         }
     </script>
 </body>
