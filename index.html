@@ -240,7 +240,6 @@
             return neighbors;
         }
 
-
         async function consultarTrenes() {
             const stationInput = document.getElementById('stationInput');
             const selectedStationValue = stationInput.value.trim();
@@ -323,8 +322,9 @@
                             const wagonsCell = row.insertCell(1);
                             const directionCell = row.insertCell(2);
 
-                            // Pasa ambos valores a formatTime: estimated (número de minutos) y timerounded (cadena "HH:MM")
-                            timeCell.textContent = formatTime(train.estimated, train.timerounded);
+                            // ¡Aquí está el cambio clave! Usamos train.timeRounded (con 'R' mayúscula)
+                            // La API devuelve "timeRounded", no "timerounded"
+                            timeCell.textContent = formatTime(train.estimated, train.timeRounded); 
                             wagonsCell.textContent = train.wagons || 'N/A';
                             directionCell.textContent = stationCodes[getStationCodeFromInput(train.direction)] || train.direction;
                         });
