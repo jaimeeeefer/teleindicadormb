@@ -265,6 +265,10 @@
                     neighbors.push({ code: "GUR", name: "Gurutzeta / Cruces" }); // L2 hacia Margen Izquierda
                     neighbors.push({ code: "LUT", name: "Lutxana" });         // L1/L2 hacia Margen Derecha / Plentzia (tramo compartido con L1)
                     break;
+                case "SAR": // Astrabudua: Conecta con Leioa y Erandio
+                    neighbors.push({ code: "SIN", name: "San Ignazio" });
+                    neighbors.push({ code: "DEU", name: "Deustu" });
+                    break;
                 // Casos especiales para el segmento AIB-NEG-GOB-ARE que pueden estar "fuera de orden" lineal estricto en la lista
                 // La lista proporcionada los tiene contiguos, así que el default debería funcionar para la mayoría.
                 // Si hay un caso donde el vecino directo en la API no es el siguiente/anterior en esta lista,
